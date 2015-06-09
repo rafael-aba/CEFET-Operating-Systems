@@ -6,36 +6,94 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include "datatypes.h"		// estruturas de dados necessárias
+#include "datatypes.h"      // estruturas de dados necessárias
 #include <ucontext.h>
 #include "queue.h"
 #include "pingpong.h"
-// #define DEBUG 1
+#include <sys/time.h>
+#include <signal.h>
+//#define DEBUG 1
 
 task_t task_main, dispatcher;
 task_t *task_corrente;
 task_t *ready = NULL;
 task_t * next = NULL;
 int id;
+int alpha = -1;
+int quantum;
+
+// estrutura que define um tratador de sinal (deve ser global ou static)
+struct sigaction action ;
+
+// estrutura de inicialização to timer
+struct itimerval timer;
 
 // funções gerais ==============================================================
 
+void ticks(int signum){
+	
+	if(task_corrente->sTask){
+		if(quantum == 0){
+			#ifdef DEBUG
+			printf("Tarefa chegou ao final do quantum: %d\n", task_corrente->tid);
+			#endif
+			
+			task_yield();
+		}
+		else{
+			quantum--;
+		}
+	}
+}
+
 task_t *scheduler(){
+
 	if (ready > 0){
-		task_t *task_selecionada = ready;
-		return task_selecionada;
+		task_t *task_next = ready->next;
+		task_t *task_lowest = ready;
+
+		// Seleciona task
+		do{
+			if (task_next->prioridade_dinamica < task_lowest->prioridade_dinamica){
+				task_lowest = task_next;
+			}
+			task_next = task_next->next;
+		}while(task_next != ready);
+
+		// Envelhecimento
+		task_next = ready;
+		do{
+			if (task_next->tid != task_lowest->tid){
+				task_next->prioridade_dinamica = task_next->prioridade_dinamica + alpha;
+			}else{
+				task_lowest->prioridade_dinamica = task_lowest->prioridade_estatica;
+			}
+			task_next = task_next->next;
+		}while (task_next != ready);
+
+		#ifdef DEBUG
+		printf("scheduler: seleciona task %d prioridade = %d\n",task_lowest->tid,task_lowest->prioridade_dinamica);
+		#endif
+
+		return task_lowest;
 	}else return 0;
 }
 
 void dispatcher_body (){ // dispatcher é uma tarefa
 	#ifdef DEBUG
-	printf("dispatcher: inicioucom fila size = %d\n",queue_size((queue_t *) ready));
+	printf("dispatcher: iniciou com fila size = %d\n",queue_size((queue_t *) ready));
 	#endif
 
 	while ( ((queue_t *) ready) > 0 ){
 		next = scheduler();  // scheduler é uma função
 		if (next){
+			#ifdef DEBUG
+
+			printf("dispatcher: iniciou com fila size = %d\n",queue_size((queue_t *) ready));
+			#endif
+
 			// ações antes de lançar a tarefa "next", se houverem
+			quantum = 20;
 			queue_remove((queue_t **) &ready,(queue_t*) next);
 			task_switch (next) ; // transfere controle para a tarefa "next"
 			// ações após retornar da tarefa "next", se houverem
@@ -53,6 +111,7 @@ void pingpong_init (){
 	task_main.next = NULL;
 	task_main.prev = NULL;
 	task_main.tid = id++;
+	task_main.sTask = 1;
 
 	// Referente ao contexto
 	ucontext_t context;
@@ -67,15 +126,37 @@ void pingpong_init (){
 
 	// Dispatcher
 	task_create(&dispatcher, (void*) (dispatcher_body),NULL);
+	dispatcher.sTask = 0;
+
+	// registra a a��o para o sinal de timer SIGALRM
+	action.sa_handler = ticks ;
+	sigemptyset (&action.sa_mask) ;
+	action.sa_flags = 0 ;
+	if (sigaction (SIGALRM, &action, 0) < 0){
+		perror ("Erro em sigaction: ") ;
+		exit (1) ;
+	}
+
+	// ajusta valores do temporizador
+	timer.it_value.tv_usec = 100 ;      // primeiro disparo, em micro-segundos
+	timer.it_value.tv_sec  = 0 ;      // primeiro disparo, em segundos
+	timer.it_interval.tv_usec = 1000 ;   // disparos subsequentes, em micro-segundos
+	timer.it_interval.tv_sec  = 0 ;   // disparos subsequentes, em segundos
+
+	// arma o temporizador ITIMER_REAL (vide man setitimer)
+	if (setitimer (ITIMER_REAL, &timer, 0) < 0){
+		perror ("Erro em setitimer: ") ;
+		exit (1) ;
+	}
 }
 
 // gerência de tarefas =========================================================
 
 // Cria uma nova tarefa. Retorna um ID> 0 ou erro.
-int task_create (task_t *task,			// descritor da nova tarefa
-                 void (*start_func)(void *),	// funcao corpo da tarefa
-                 void *arg){			// argumentos para a tarefa
-	
+int task_create (task_t *task,          // descritor da nova tarefa
+                 void (*start_func)(void *),    // funcao corpo da tarefa
+                 void *arg){            // argumentos para a tarefa
+    
 	task->next = NULL;
 	task->prev = NULL;
 	task->tid = id++;
@@ -99,12 +180,18 @@ int task_create (task_t *task,			// descritor da nova tarefa
 	makecontext(&context, (void*) (*start_func), id, arg);
 	task->context = context;
 
-	if (task != &dispatcher)
+	if (task != &dispatcher){
 		queue_append((queue_t **) &ready,(queue_t*) task);
+		task->prioridade_estatica = 0;
+		task->prioridade_dinamica = 0;
+		task->sTask = 1;
+	}
 
 	#ifdef DEBUG
-	printf("task_create: criou tarefa %d\n",task->tid);
-	#endif	
+	if (task->tid > 1){
+		printf("task_create: criou tarefa %d\n",task->tid);
+	}else printf("task_create: criou dispatcher %d\n",task->tid);
+	#endif  
 }
 
 // Termina a tarefa corrente, indicando um valor de status encerramento
@@ -117,13 +204,14 @@ void task_exit (int exitCode){
 		task_switch(&task_main);
 	}
 	else {
-		queue_remove((queue_t **) &ready,(queue_t*)task_corrente);
+		queue_remove((queue_t **) &ready,(queue_t*) task_corrente);
 		task_switch(&dispatcher);
 	}
 }
 
 // alterna a execução para a tarefa indicada
 int task_switch (task_t *task){
+
 	task_t *aux = task_corrente;
 	task_corrente = task;
 
@@ -156,20 +244,50 @@ void task_resume (task_t *task){
 // libera o processador para a próxima tarefa, retornando à fila de tarefas
 // prontas ("ready queue")
 void task_yield (){
-	// chama dispatcher
 	if (task_corrente->tid != 0 && task_corrente->tid != 1)
 		queue_append((queue_t **) &ready,(queue_t*) task_corrente);
+	// chama dispatcher
+	#ifdef DEBUG
+	printf("task_yield: task %d chama dispatcher\n",task_corrente->tid);
+	#endif
 
 	task_switch(&dispatcher);
 }
 
 // define a prioridade estática de uma tarefa (ou a tarefa atual)
 void task_setprio (task_t *task, int prio){
+
+	#ifdef DEBUG
+	if (task == NULL)
+		printf("task_setprio: Task %d muda prioridade %d -> %d\n",task_corrente->tid,task_corrente->prioridade_estatica,prio);
+	else if (task->prioridade_estatica > -20 && task->prioridade_estatica < 20)
+		printf("task_setprio: Task %d muda prioridade %d -> %d\n",task->tid,task->prioridade_estatica,prio);
+	#endif
+
+	if (task == NULL){
+		task_corrente->prioridade_estatica = prio;
+		task_corrente->prioridade_dinamica = prio;
+	}else if (task->prioridade_estatica > -20 && task->prioridade_estatica < 20){
+		task->prioridade_estatica = prio;
+		task->prioridade_dinamica = prio;
+	}
+
 }
 
 // retorna a prioridade estática de uma tarefa (ou a tarefa atual)
 int task_getprio (task_t *task){
-	return 0;
+	int sol;
+
+	#ifdef DEBUG
+	if (task == NULL)
+		printf("task_getprio: Task %d retorna prioridade %d\n",task_corrente->tid,task_corrente->prioridade_estatica);
+	else
+		printf("task_getprio: Task %d retorna prioridade %d\n",task->tid,task->prioridade_estatica);
+	#endif
+
+	if (task == NULL) sol = task_corrente->prioridade_estatica;
+	else sol = task->prioridade_estatica;
+	return sol;
 }
 
 // operações de sincronização ==================================================
