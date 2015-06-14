@@ -278,8 +278,7 @@ void task_resume (task_t *task){
 // libera o processador para a próxima tarefa, retornando à fila de tarefas
 // prontas ("ready queue")
 void task_yield (){
-	if (task_corrente->tid != 1)
-		queue_append((queue_t **) &ready,(queue_t*) task_corrente);
+	queue_append((queue_t **) &ready,(queue_t*) task_corrente);
 	// chama dispatcher
 	#ifdef DEBUG
 	printf("task_yield: task %d chama dispatcher\n",task_corrente->tid);
