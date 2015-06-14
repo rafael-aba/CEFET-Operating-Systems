@@ -1,9 +1,12 @@
 Aluno: Rafael Antunes Batista
 
 Compilar:
-gcc queue.c pinpong.c pingpong-contab.c
-ou
-gcc queue.c pinpong.c pingpong-contab-prio.c
+Time Counter: 
+	gcc queue.c pinpong_contab.c pingpong-contab.c
+	ou
+	gcc queue.c pinpong_contab.c pingpong-contab-prio.c
+Main Task: 
+	gcc queue.c pinpong.c pingpong-maintask.c
 
 Executar:
 ./a.out
