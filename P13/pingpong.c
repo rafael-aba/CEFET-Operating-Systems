@@ -52,6 +52,13 @@ void ticks(int signum){
 		else{
 			quantum--;
 		}
+	}else{
+		taskTimeEnd = systime();
+		task_corrente->runningTime += taskTimeEnd - taskTimeStart;
+		task_corrente->activations++;
+
+		taskTimeStart = 0;
+		taskTimeEnd = 0;
 	}
 }
 
@@ -123,6 +130,12 @@ void pingpong_init (){
 	task_main.prev = NULL;
 	task_main.tid = id++;
 	task_main.sTask = 1;
+	task_main.prioridade_estatica = 0;
+	task_main.prioridade_dinamica = 0;
+	task_main.sTask = 1;
+	task_main.activations = 0;
+	task_main.runningTime = 0;
+	queue_append((queue_t **) &ready,(queue_t*) &task_main);
 
 	// Referente ao contexto
 	ucontext_t context;
@@ -162,6 +175,8 @@ void pingpong_init (){
 		perror ("Erro em setitimer: ") ;
 		exit (1) ;
 	}
+
+	task_yield ();
 }
 
 // gerência de tarefas =========================================================
@@ -263,7 +278,7 @@ void task_resume (task_t *task){
 // libera o processador para a próxima tarefa, retornando à fila de tarefas
 // prontas ("ready queue")
 void task_yield (){
-	if (task_corrente->tid != 0 && task_corrente->tid != 1)
+	if (task_corrente->tid != 1)
 		queue_append((queue_t **) &ready,(queue_t*) task_corrente);
 	// chama dispatcher
 	#ifdef DEBUG
