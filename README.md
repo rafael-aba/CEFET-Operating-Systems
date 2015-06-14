@@ -29,3 +29,5 @@ P10: Despache de Tarefas / Task Dispatcher: http://dainf.ct.utfpr.edu.br/~mazier
 P11: Escalonamento por Prioridades / Priority Scheduling: http://dainf.ct.utfpr.edu.br/~maziero/doku.php/so:escalonador_por_prioridades
 
 P12: Peempção e compartilhamento de tempo / Preemption and Time Sharing: http://dainf.ct.utfpr.edu.br/~maziero/doku.php/so:preempcao_por_tempo
+
+P13: Contabilização de Tarefas + Tarefa Main / Task Counter + Main Task: http://dainf.ct.utfpr.edu.br/~maziero/doku.php/so:contabilizacao + http://dainf.ct.utfpr.edu.br/~maziero/doku.php/so:tarefa_main	
