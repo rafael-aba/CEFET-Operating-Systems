@@ -52,13 +52,6 @@ void ticks(int signum){
 		else{
 			quantum--;
 		}
-	}else{
-		taskTimeEnd = systime();
-		task_corrente->runningTime += taskTimeEnd - taskTimeStart;
-		task_corrente->activations++;
-
-		taskTimeStart = 0;
-		taskTimeEnd = 0;
 	}
 }
 

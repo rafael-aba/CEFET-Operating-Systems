@@ -23,7 +23,7 @@ int alpha = -1;
 int quantum;
 
 int time = 0;
-int taskTimeStart, taskTimeEnd;
+int taskTimeStart;
 
 // estrutura que define um tratador de sinal (deve ser global ou static)
 struct sigaction action ;
@@ -35,17 +35,15 @@ struct itimerval timer;
 void ticks(int signum){
 	time++;
 	if(task_corrente->sTask){
-		if(quantum == 0){
+		if(quantum == 1){
 			#ifdef DEBUG
 			printf("Tarefa chegou ao final do quantum: %d\n", task_corrente->tid);
 			#endif
 			
-			taskTimeEnd = systime();
-			task_corrente->runningTime += taskTimeEnd - taskTimeStart;
+			task_corrente->runningTime += systime() - taskTimeStart;
 			task_corrente->activations++;
 
 			taskTimeStart = 0;
-			taskTimeEnd = 0;
 
 			task_yield();
 		}
@@ -97,6 +95,7 @@ void dispatcher_body (){ // dispatcher é uma tarefa
 		task_corrente->activations++;
 		next = scheduler();  // scheduler é uma função
 		if (next){
+
 			#ifdef DEBUG
 
 			printf("dispatcher: iniciou com fila size = %d\n",queue_size((queue_t *) ready));
