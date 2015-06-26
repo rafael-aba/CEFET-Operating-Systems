@@ -32,4 +32,4 @@ P12: Peempção e compartilhamento de tempo / Preemption and Time Sharing: http:
 
 P13: Contabilização de Tarefas + Tarefa Main / Task Counter + Main Task: http://dainf.ct.utfpr.edu.br/~maziero/doku.php/so:contabilizacao + http://dainf.ct.utfpr.edu.br/~maziero/doku.php/so:tarefa_main	
 
-P13: Algoritmos de Substituição de Páginas / Page Replacement Algorithm: http://dainf.ct.utfpr.edu.br/~maziero/doku.php/so:algoritmos_de_substituicao_de_paginas
+P14: Algoritmos de Substituição de Páginas / Page Replacement Algorithm: http://dainf.ct.utfpr.edu.br/~maziero/doku.php/so:algoritmos_de_substituicao_de_paginas
